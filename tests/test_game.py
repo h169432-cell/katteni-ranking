@@ -12,6 +12,7 @@ class GameTests(unittest.TestCase):
         room_created = app.new_room()
         self.code = room_created['code']
         self.host_token = room_created['hostToken']
+        self.host_player = room_created['participantToken']
         self.room = app.ROOMS[self.code]
 
     def join(self, name):
@@ -39,13 +40,13 @@ class GameTests(unittest.TestCase):
         self.assertNotIn('results', state_a)
         self.assertEqual(app.update_room(self.room, 'reveal', {'hostToken': self.host_token})[0], 200)
         results = app.get_state(self.room, a)['results']
-        self.assertEqual(len(results), 2)
+        self.assertEqual(len(results), 3)
         self.assertEqual(results[0]['rank'], 1)
         self.assertEqual(results[1]['rank'], 1)
         self.assertEqual(self.room['round'], 1)
         self.assertEqual(app.update_room(self.room, 'next', {'hostToken': self.host_token})[0], 200)
         self.assertEqual(self.room['round'], 2)
-        self.assertNotEqual(self.room['topic_index'], self.room['used_topics'][0])
+        self.assertEqual(app.get_state(self.room, a)['topic']['question'], 'この中で一番面白いのは誰？？')
         self.assertEqual(app.get_state(self.room, a)['myVote'], None)
 
     def test_reject_illegal_actions(self):
@@ -73,68 +74,51 @@ class GameTests(unittest.TestCase):
         app.update_room(self.room, 'reveal', {'hostToken': self.host_token})
         app.update_room(self.room, 'next', {'hostToken': self.host_token})
         self.assertTrue(app.get_state(self.room, c)['eligible'])
-        self.assertEqual(app.get_state(self.room, c)['voterCount'], 3)
+        self.assertEqual(app.get_state(self.room, c)['voterCount'], 4)
 
     def test_rename_and_validation(self):
         a = self.join('山田')
         self.assertEqual(app.join_room(self.room, {'name': '山田', 'participantToken': a})[0], 200)
-        self.assertEqual(len(self.room['participants']), 1)
+        self.assertEqual(len(self.room['participants']), 2)
         self.assertEqual(app.join_room(self.room, {'name': 'a' * 15})[0], 400)
         self.assertEqual(app.join_room(self.room, {'name': '<img src=x onerror=1>'})[0], 400)
 
-    def test_host_adds_questions_to_existing_topic_pool(self):
-        question = 'この中でいちばん動物と話せそうなのは？'
+    def test_only_fixed_question_and_host_participates(self):
+        host = app.get_state(self.room, self.host_token)
+        self.assertEqual(host['me']['name'], '橋野')
+        self.assertNotEqual(self.host_token, self.host_player)
+        self.assertNotIn(self.host_token, str(host['participants']))
+        self.assertEqual(app.update_room(self.room, 'start', {'hostToken': self.host_token})[0], 400)
+        a = self.join('参加者')
+        self.assertEqual(app.join_room(self.room, {'name': '橋野'})[0], 400)
         self.assertEqual(app.update_room(self.room, 'add-topic', {
-            'hostToken': self.host_token, 'question': question})[0], 200)
-        self.assertEqual(len(app.TOPICS), 30)
-        self.assertEqual(self.room['custom_topics'], [(question, app.CUSTOM_AWARD)])
-        self.assertEqual(app.get_state(self.room, self.host_token)['customQuestions'], [question])
-        a = self.join('田中')
-        self.join('佐藤')
-        self.assertNotIn('customQuestions', app.get_state(self.room, a))
-        self.assertEqual(app.update_room(self.room, 'start', {'hostToken': self.host_token})[0], 200)
-        # Every one of the 31 questions appears exactly once before any repeats.
-        questions = []
-        for i in range(31):
-            if i:
-                self.room['status'] = 'revealed'
-                self.assertEqual(app.update_room(self.room, 'next', {'hostToken': self.host_token})[0], 200)
-            questions.append(app.get_state(self.room, self.host_token)['topic']['question'])
-        self.assertEqual(len(set(questions)), 31)
-        self.assertIn(question, questions)
-        self.assertEqual(len(self.room['used_topics']), 31)
-
-    def test_add_question_authorization_and_validation(self):
-        self.assertEqual(app.update_room(self.room, 'add-topic', {'question': '無断追加'})[0], 403)
-        self.assertEqual(app.update_room(self.room, 'add-topic', {
-            'hostToken': 'not-host', 'question': '無断追加'})[0], 403)
-        for invalid in ['', '  \n  ', 'a' * 121, 123, 'foo\x00bar']:
-            self.assertEqual(app.update_room(self.room, 'add-topic', {
-                'hostToken': self.host_token, 'question': invalid})[0], 400)
-        question = 'オリジナルのお題は誰？'
-        payload = {'hostToken': self.host_token, 'question': question}
-        self.assertEqual(app.update_room(self.room, 'add-topic', payload)[0], 200)
-        self.assertEqual(app.update_room(self.room, 'add-topic', payload)[0], 400)
-        self.assertEqual(app.update_room(self.room, 'add-topic', {
-            'hostToken': self.host_token, 'question': app.TOPICS[0][0]})[0], 400)
-        self.assertEqual(len(self.room['custom_topics']), 1)
-
-    def test_added_questions_during_voting_applies_next_round(self):
-        a = self.join('あ')
-        b = self.join('い')
+            'hostToken': self.host_token, 'question': '別の質問'})[0], 400)
         app.update_room(self.room, 'start', {'hostToken': self.host_token})
-        current = app.get_state(self.room, self.host_token)['topic']['question']
-        question = '今追加されたお題は誰？'
-        self.assertEqual(app.update_room(self.room, 'add-topic', {
-            'hostToken': self.host_token, 'question': question})[0], 200)
-        self.assertEqual(app.get_state(self.room, self.host_token)['topic']['question'], current)
-        app.update_room(self.room, 'vote', {'participantToken': a, 'candidateId': b})
+        for _ in range(3):
+            state = app.get_state(self.room, self.host_token)
+            self.assertEqual(state['topic']['question'], 'この中で一番面白いのは誰？？')
+            self.assertTrue(state['eligible'])
+            self.assertNotIn('hostWinner', state)
+            app.update_room(self.room, 'vote', {'participantToken': a, 'candidateId': self.host_player})
+            app.update_room(self.room, 'vote', {'participantToken': self.host_player, 'candidateId': a})
+            self.assertEqual(app.get_state(self.room, self.host_token)['myVote'], a)
+            app.update_room(self.room, 'reveal', {'hostToken': self.host_token})
+            self.assertTrue(app.get_state(self.room, a)['hostWinner'])  # Tied first also wins.
+            app.update_room(self.room, 'next', {'hostToken': self.host_token})
+
+    def test_host_win_and_loss(self):
+        a = self.join('A')
+        b = self.join('B')
+        app.update_room(self.room, 'start', {'hostToken': self.host_token})
+        for token in [a, b]:
+            app.update_room(self.room, 'vote', {'participantToken': token, 'candidateId': self.host_player})
         app.update_room(self.room, 'reveal', {'hostToken': self.host_token})
-        # Make every existing topic count as used, so the newly-added one is next.
-        self.room['used_topics'] = list(range(30))
+        self.assertTrue(app.get_state(self.room, a)['hostWinner'])
         app.update_room(self.room, 'next', {'hostToken': self.host_token})
-        state = app.get_state(self.room, self.host_token)
-        self.assertEqual(state['topic'], {'question': question, 'award': app.CUSTOM_AWARD})
+        for token in [self.host_player, b]:
+            app.update_room(self.room, 'vote', {'participantToken': token, 'candidateId': a})
+        app.update_room(self.room, 'reveal', {'hostToken': self.host_token})
+        self.assertFalse(app.get_state(self.room, b)['hostWinner'])
 
 
 if __name__ == '__main__':

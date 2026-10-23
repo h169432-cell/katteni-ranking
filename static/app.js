@@ -11,7 +11,6 @@
   let knownRound = 0;
   let busy = false;
   let toastTimer;
-  let questionDraft = '';
   let mode = roomCode ? 'room' : 'home';
 
   function esc(s) {
@@ -22,7 +21,7 @@
   function shareUrl() { return `${location.origin}/?room=${encodeURIComponent(roomCode)}`; }
   function setRoom(code) {
     roomCode = code.toUpperCase(); mode = 'room'; state = null; stateVersion = -1;
-    knownRound = 0; selectedId = null; editingVote = false; questionDraft = '';
+    knownRound = 0; selectedId = null; editingVote = false;
     history.pushState({room: roomCode}, '', `/?room=${encodeURIComponent(roomCode)}`);
   }
   function showToast(message) {
@@ -67,10 +66,10 @@
     shell(`<main><section class="hero"><div>
       <div class="eyebrow">PARTY GAME / NO DOWNLOAD</div>
       <h1>勝手に決めて、<br><em>みんなで笑う。</em></h1>
-      <p class="hero-copy">「この中で、いちばん〇〇なのは？」<br>みんなでこっそり投票して、結果をド派手に発表。<br>飲み会が一瞬で盛り上がる、匿名ランキングゲーム。</p>
+      <p class="hero-copy">「この中で一番面白いのは誰？？」<br>みんなでこっそり投票して、結果をド派手に発表。<br>飲み会が一瞬で盛り上がる、匿名ランキングゲーム。</p>
       <div class="hero-cta"><button type="button" class="btn btn-yellow" data-action="create">🏆 幹事として始める <span aria-hidden="true">→</span></button><button type="button" class="btn btn-white" data-action="join-screen">📱 参加する</button></div>
       <div class="tiny-info">✓ 無料で遊べる　 ✓ アプリのインストール不要　 ✓ 2〜40人対応</div>
-    </div><div class="hero-art" aria-hidden="true"><div class="art-star">✷</div><div class="sticker one">🤫 匿名投票</div><div class="fake-phone"><div class="fake-top">QUESTION 03</div><div class="fake-question">1億円当たっても<br>翌日出社しそうな人は？</div><div class="fake-row top"><span>🥇 田中さん</span><span class="pink">7票</span></div><div class="fake-row"><span>🥈 山本さん</span><span>3票</span></div><div class="fake-row"><span>🥉 鈴木さん</span><span>1票</span></div></div><div class="sticker two">😂 まさかの1位！</div></div></section>
+    </div><div class="hero-art" aria-hidden="true"><div class="art-star">✷</div><div class="sticker one">🤫 匿名投票</div><div class="fake-phone"><div class="fake-top">QUESTION 01</div><div class="fake-question">この中で一番<br>面白いのは誰？？</div><div class="fake-row top"><span>🥇 田中さん</span><span class="pink">7票</span></div><div class="fake-row"><span>🥈 山本さん</span><span>3票</span></div><div class="fake-row"><span>🥉 鈴木さん</span><span>1票</span></div></div><div class="sticker two">😂 まさかの1位！</div></div></section>
     <section class="steps"><div class="steps-inner"><div class="step"><span class="step-number">1</span>幹事が部屋を作る</div><div class="step"><span class="step-number">2</span>全員がスマホで匿名投票</div><div class="step"><span class="step-number">3</span>結果を一斉発表！</div></div></section></main>`, true);
   }
   function renderJoin() {
@@ -98,28 +97,23 @@
   }
   function sideHost() {
     return `<aside class="room-sidebar"><div class="panel"><div class="side-heading">📱 スマホで参加</div><p class="hint">このQRコードを参加者に見せてください。</p><div class="qr-wrap"><img alt="参加用QRコード" src="/api/qr?url=${encodeURIComponent(shareUrl())}"></div><p class="side-copy">または部屋コードを入力</p><div class="code-feature"><span>ROOM CODE</span><strong>${esc(roomCode)}</strong></div><div class="join-url">${esc(shareUrl())}</div><button type="button" data-action="copy-url" class="btn btn-ghost btn-wide btn-small" style="margin-top:16px">🔗 参加リンクをコピー</button></div>
-      <div class="panel"><div class="side-heading">👥 参加者 <span class="badge-soft">${state.participants.length}人</span></div>${chips()}<div class="separator"></div><p class="hint">幹事の画面をテレビやプロジェクターに表示すると、結果発表が盛り上がります。</p></div>
-      <div class="panel"><div class="side-heading">✏️ 質問を追加 <span class="badge-soft">追加 ${state.customQuestions.length}問</span></div>
-      <p class="hint">自分で作った質問が、元の30問と一緒にランダム出題されます。ゲーム中も追加できます。</p>
-      <form id="topic-form" class="topic-form"><label class="field" for="topic-input">追加したい質問</label><textarea id="topic-input" class="text-input topic-input" name="question" maxlength="120" rows="3" placeholder="例：この中で一番、宇宙人と仲良くなりそうな人は？" required>${esc(questionDraft)}</textarea>
-      <button type="submit" class="btn btn-dark btn-wide btn-small">＋ この質問を追加</button></form>
-      ${state.customQuestions.length ? `<div class="custom-question-heading">追加済みの質問</div><ol class="custom-question-list">${state.customQuestions.map(q => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}</div></aside>`;
+      <div class="panel"><div class="side-heading">👥 参加者 <span class="badge-soft">${state.participants.length}人</span></div>${chips()}<div class="separator"></div><p class="hint">幹事の画面をテレビやプロジェクターに表示すると、結果発表が盛り上がります。</p></div></aside>`;
   }
   function hostContent() {
     let stage;
     if (state.status === 'lobby') {
-      stage = `<div class="stage"><span class="phase">👋 WELCOME!</span><h1 class="stage-title">みんな集まったら、<br>ランキング開始！</h1><p class="stage-description">右のQRコードから参加してもらおう。<br>2人以上集まればスタートできます。</p><div class="stage-actions"><button type="button" class="btn btn-dark" data-action="start" ${state.participants.length < 2 ? 'disabled' : ''}>最初のお題へ →</button></div></div>`;
+      stage = `<div class="stage"><span class="phase">👋 WELCOME!</span><h1 class="stage-title">みんな集まったら、<br>ランキング開始！</h1><p class="stage-description">右のQRコードから参加してもらおう。<br>幹事は「橋野」で参加しています。<br>2人以上集まればスタートできます。</p><div class="stage-actions"><button type="button" class="btn btn-dark" data-action="start" ${state.participants.length < 2 ? 'disabled' : ''}>最初のお題へ →</button></div></div>`;
     } else if (state.status === 'voting') {
-      stage = `<div class="stage"><span class="subtle-label">QUESTION ${String(state.round).padStart(2, '0')}</span><span class="phase pink">🤫 こっそり投票中</span><h1 class="stage-title">${esc(state.topic.question)}</h1><p class="stage-description">スマホで1人を選んで投票してください。</p><div style="width:100%">${progress()}</div><div class="stage-actions"><button type="button" class="btn btn-pink" data-action="reveal" ${!state.votedCount ? 'disabled' : ''}>🎉 結果を発表する →</button></div>${state.votedCount === state.voterCount ? '<div class="callout">🎊 全員の投票が完了！発表の準備OK！</div>' : ''}</div>`;
+      stage = `<div class="stage"><span class="subtle-label">QUESTION ${String(state.round).padStart(2, '0')}</span><span class="phase pink">🤫 こっそり投票中</span><h1 class="stage-title">${esc(state.topic.question)}</h1><p class="stage-description">スマホで1人を選んで投票してください。</p><div class="host-vote">${playerVoting(false)}</div><div style="width:100%">${progress()}</div><div class="stage-actions"><button type="button" class="btn btn-pink" data-action="reveal" ${!state.votedCount ? 'disabled' : ''}>🎉 結果を発表する →</button></div>${state.votedCount === state.voterCount ? '<div class="callout">🎊 全員の投票が完了！発表の準備OK！</div>' : ''}</div>`;
     } else {
-      stage = `<div>${resultHTML()}<div class="stage-actions"><button type="button" class="btn btn-dark" data-action="next">次のお題へ →</button></div></div>`;
+      stage = `<div>${resultHTML()}<div class="stage-actions"><button type="button" class="btn btn-dark" data-action="next">もう一度投票する →</button></div></div>`;
     }
     return `<main class="layout"><div class="two-col"><section class="panel">${headerRoom()}${stage}</section>${sideHost()}</div></main>`;
   }
   function playerLobby() {
     return `<div class="stage stage-center"><div class="success-emoji">🙌</div><span class="phase">参加できました！</span><h1 class="stage-title">${esc(state.me.name)}さん、<br>いらっしゃい！</h1><p class="stage-description">お題が始まるまで、そのままお待ちください。<br>参加者は現在 ${state.participants.length}人！</p><div class="participant-chips" style="justify-content:center">${state.participants.map(p => `<span class="chip">${esc(p.name)}</span>`).join('')}</div><div class="callout">⏳ 幹事がスタートしたら自動で画面が切り替わります。</div></div>`;
   }
-  function playerVoting() {
+  function playerVoting(showQuestion = true) {
     const eligible = state.eligible;
     if (!eligible) {
       return `<div class="stage stage-center"><div class="success-emoji">⏭️</div><h1 class="stage-title">次のお題から参加！</h1><p class="stage-description">このお題はすでに始まっていました。<br>次のラウンドでは投票できます。</p></div>`;
@@ -133,7 +127,7 @@
       const selected = p.id === selectedId;
       return `<button type="button" class="vote-option ${selected ? 'selected' : ''}" data-action="pick" data-id="${esc(p.id)}" aria-pressed="${selected}" ${isMe ? 'disabled' : ''}><span class="vote-icon">${selected ? '💗' : isMe ? '🙋' : '👤'}</span>${esc(p.name)}${isMe ? '<span class="hint">自分です</span>' : ''}</button>`;
     }).join('');
-    return `<div><span class="subtle-label">QUESTION ${String(state.round).padStart(2, '0')}</span><h1 class="h1" style="margin-top:4px;line-height:1.48">${esc(state.topic.question)}</h1><div class="vote-grid">${options}</div><div class="vote-tip">🤫 投票は匿名／自分以外に1票</div><button type="button" class="btn btn-pink btn-wide" data-action="vote" style="margin-top:20px" ${!selectedId ? 'disabled' : ''}>${state.myVote ? '投票を変更する' : 'この人に投票する'} →</button></div>`;
+    return `<div>${showQuestion ? `<span class="subtle-label">QUESTION ${String(state.round).padStart(2, '0')}</span><h1 class="h1" style="margin-top:4px;line-height:1.48">${esc(state.topic.question)}</h1>` : ''}<div class="vote-grid">${options}</div><div class="vote-tip">🤫 投票は匿名／自分以外に1票</div><button type="button" class="btn btn-pink btn-wide" data-action="vote" style="margin-top:20px" ${!selectedId ? 'disabled' : ''}>${state.myVote ? '投票を変更する' : 'この人に投票する'} →</button></div>`;
   }
   function resultHTML() {
     const results = state.results || [];
@@ -141,29 +135,65 @@
     const winnerName = winners.map(p => p.name).join(' ＆ ');
     const maxVotes = Math.max(1, ...results.map(p => p.votes));
     const rows = results.map(p => `<div class="rank-row ${p.rank === 1 ? 'first' : ''}"><div class="rank-num">${p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : p.rank + '位'}</div><div class="rank-main"><div class="rank-person">${esc(p.name)}</div><div class="rank-track"><div class="rank-bar" style="width:${Math.round(p.votes * 100 / maxVotes)}%"></div></div></div><div class="rank-votes">${p.votes}<span class="hint">票</span></div></div>`).join('');
-    return `<div><div class="result-hero"><span class="result-medal">🏆</span><div class="result-label">第${state.round}問・勝手にNo.1 決定！</div><h1 class="result-winner">${esc(winnerName)}</h1><div class="result-award">👑 ${esc(state.topic.award)}</div><p class="hint" style="margin-top:18px">${state.votedCount}人の投票で決定！${winners.length > 1 ? ' なんと同率1位！' : ''}</p></div><div class="h3">📊 投票結果</div><div class="rank-list">${rows}</div></div>`;
+    const celebration = state.hostWinner ? `<div class="host-celebration"><img src="/hashino.jpg" alt="橋野の記念写真"><p>企画経理に橋野あり！</p>${state.isHost ? '<button type="button" class="btn btn-pink" data-action="play-celebration">🔊 音声を再生する</button><p class="hint" id="audio-status" role="status"></p>' : ''}</div>` : '';
+    return `<div>${celebration}<div class="result-hero"><span class="result-medal">🏆</span><div class="result-label">第${state.round}問・勝手にNo.1 決定！</div><h1 class="result-winner">${esc(winnerName)}</h1><div class="result-award">👑 ${esc(state.topic.award)}</div><p class="hint" style="margin-top:18px">${state.votedCount}人の投票で決定！${winners.length > 1 ? ' なんと同率1位！' : ''}</p></div><div class="h3">📊 投票結果</div><div class="rank-list">${rows}</div></div>`;
   }
   function participantContent() {
-    let content = state.status === 'lobby' ? playerLobby() : state.status === 'voting' ? playerVoting() : `${resultHTML()}<p class="hint" style="text-align:center;margin-top:25px">次のお題を待っています <span class="waiting-dots">●●●</span></p>`;
+    let content = state.status === 'lobby' ? playerLobby() : state.status === 'voting' ? playerVoting() : `${resultHTML()}<p class="hint" style="text-align:center;margin-top:25px">次の投票を待っています <span class="waiting-dots">●●●</span></p>`;
     return `<main class="layout"><section class="panel center-panel" style="margin-top:18px">${headerRoom()}${content}</section></main>`;
   }
   function render() {
     if (mode === 'home') { renderHome(); return; }
     if (mode === 'join' || !roomCode || (state && !state.isHost && !state.me)) { renderJoin(); return; }
     if (!state) { root.innerHTML = '<div class="boot"><div class="loader"></div>部屋を読み込み中…</div>'; return; }
-    const active = document.activeElement;
-    const focusedQuestion = active && active.id === 'topic-input';
-    const selection = focusedQuestion ? [active.selectionStart, active.selectionEnd] : null;
     shell(state.isHost ? hostContent() : participantContent());
-    if (focusedQuestion && state.isHost) {
-      const input = document.getElementById('topic-input');
-      input.focus({preventScroll: true});
-      input.setSelectionRange(selection[0], selection[1]);
-    }
   }
-  document.addEventListener('input', event => {
-    if (event.target.id === 'topic-input') questionDraft = event.target.value;
-  });
+  let audioContext;
+  let audioBufferPromise;
+  let audioSource;
+  function prepareCelebrationAudio() {
+    try {
+      const Context = window.AudioContext || window.webkitAudioContext;
+      if (!Context) return Promise.resolve(false);
+      if (!audioContext) audioContext = new Context();
+      const resumed = audioContext.resume();
+      if (!audioBufferPromise) {
+        audioBufferPromise = fetch('/hashino.mp3').then(response => {
+          if (!response.ok) throw new Error('音声を取得できません');
+          return response.arrayBuffer();
+        }).then(bytes => audioContext.decodeAudioData(bytes)).catch(error => {
+          audioBufferPromise = null;
+          throw error;
+        });
+      }
+      return Promise.all([resumed, audioBufferPromise]).then(() => true).catch(() => false);
+    } catch (_) { return Promise.resolve(false); }
+  }
+  async function playCelebration() {
+    if (!state || !state.isHost || !state.hostWinner || state.status !== 'revealed') return;
+    const room = roomCode;
+    const round = state.round;
+    const ready = await prepareCelebrationAudio();
+    if (!state || room !== roomCode || round !== state.round || state.status !== 'revealed') return;
+    const status = document.getElementById('audio-status');
+    if (!ready || audioContext.state !== 'running') {
+      if (status) status.textContent = '音声を再生するボタンを押してください。';
+      return;
+    }
+    if (audioSource) { audioSource.onended = null; audioSource.stop(); }
+    const source = audioContext.createBufferSource();
+    source.buffer = await audioBufferPromise;
+    const volume = audioContext.createGain();
+    volume.gain.value = 1;
+    source.connect(volume).connect(audioContext.destination);
+    source.onended = () => {
+      if (audioSource === source) audioSource = null;
+      if (status && status.isConnected) status.textContent = '再生完了';
+    };
+    audioSource = source;
+    source.start();
+    if (status) status.textContent = '「企画経理に橋野あり！」再生中';
+  }
   async function runTask(callback) {
     if (busy) return;
     busy = true;
@@ -178,6 +208,7 @@
     if (!btn) return;
     event.preventDefault();
     const action = btn.dataset.action;
+    if (action === 'play-celebration') { await playCelebration(); return; }
     if (action === 'home') {
       history.pushState({}, '', '/'); mode = 'home'; state = null; roomCode = ''; render(); return;
     }
@@ -191,18 +222,25 @@
     if (action === 'pick') { selectedId = btn.dataset.id; render(); return; }
     if (action === 'change-vote') { editingVote = true; selectedId = state.myVote; render(); return; }
     if (action === 'create') {
+      prepareCelebrationAudio();
       await runTask(async () => {
         btn.disabled = true; btn.textContent = '部屋を作成中…';
         const data = await request('/api/rooms', 'POST', {});
         localStorage.setItem(`kr:host:${data.code}`, data.hostToken);
+        localStorage.setItem(`kr:player:${data.code}`, data.participantToken);
         setRoom(data.code); await refresh(true);
       }); return;
     }
     if (action === 'start' || action === 'reveal' || action === 'next') {
+      prepareCelebrationAudio();
+      if (audioSource) { audioSource.onended = null; audioSource.stop(); audioSource = null; }
       await runTask(async () => {
         await doPost(action, {hostToken: localStorage.getItem(`kr:host:${roomCode}`)});
         await refresh(true);
-        if (action === 'reveal') window.scrollTo({top:0,behavior:'smooth'});
+        if (action === 'reveal') {
+          window.scrollTo({top:0,behavior:'smooth'});
+          await playCelebration();
+        }
       }); return;
     }
     if (action === 'vote') {
@@ -214,17 +252,6 @@
     }
   });
   document.addEventListener('submit', async (event) => {
-    if (event.target.id === 'topic-form') {
-      event.preventDefault();
-      const question = questionDraft.trim();
-      await runTask(async () => {
-        await doPost('add-topic', {hostToken: localStorage.getItem(`kr:host:${roomCode}`), question});
-        questionDraft = '';
-        await refresh(true);
-        showToast('質問を追加しました！');
-      });
-      return;
-    }
     if (event.target.id !== 'join-form') return;
     event.preventDefault();
     const codeInput = event.target.elements.code;

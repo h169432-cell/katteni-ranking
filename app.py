@@ -25,42 +25,7 @@ LOCK = threading.RLock()
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 EXPIRY_SECONDS = 8 * 60 * 60
 MAX_PARTICIPANTS = 40
-MAX_CUSTOM_TOPICS = 100
-MAX_QUESTION_LENGTH = 120
-CUSTOM_AWARD = "みんなが選んだNo.1"
-
-TOPICS = [
-    ("宝くじで1億円当たっても、翌日ふつうに出社しそうなのは？", "労働界のラスボス"),
-    ("無人島に行ったら、いちばん最初に『帰りたい』と言いそうなのは？", "無人島の即日帰宅王"),
-    ("『ここだけの話』を5分後には全員に話していそうなのは？", "歩くニュース速報"),
-    ("酔っ払ったら、同じ話を3回くらいしそうなのは？", "無限リピート大臣"),
-    ("ゾンビ映画で、なぜか最後まで生き残りそうなのは？", "謎の生存力No.1"),
-    ("突然100万円もらったら、いちばん謎の物を買いそうなのは？", "浪費のファンタジスタ"),
-    ("カラオケでマイクを渡したら、別人格になりそうなのは？", "マイクの封印解除者"),
-    ("宇宙人に連れ去られても、友達になって帰ってきそうなのは？", "銀河系コミュ力王"),
-    ("旅行前夜に、まったく荷造りしていなさそうなのは？", "準備しない勇者"),
-    ("レストランで全員の注文を一瞬で覚えそうなのは？", "注文記憶の天才"),
-    ("ドラマ化されたら、絶対に主役より目立ちそうなのは？", "主役を食う名脇役"),
-    ("じゃんけんで負けた後、いちばん言い訳が長そうなのは？", "負け惜しみ評論家"),
-    ("『今から行く』と言いつつ、まだ家にいそうなのは？", "時空の旅人"),
-    ("スーパーの試食だけで夕飯を済ませられそうなのは？", "試食のプロフェッショナル"),
-    ("お店の店員さんと、気づけば親友になっていそうなのは？", "初対面フレンド職人"),
-    ("朝起きたら有名人になっていても、いちばん平常運転そうなのは？", "平常心の化身"),
-    ("『1曲だけ』と言いながら、カラオケで10曲歌いそうなのは？", "アンコール製造機"),
-    ("世界が終わる前日にも、ポイントカードを気にしていそうなのは？", "ポイント界の守護神"),
-    ("人生で一度は、謎の発明をしてニュースになりそうなのは？", "未来の珍発明家"),
-    ("ホテルのビュッフェで、最強の盛り付けを完成させそうなのは？", "ビュッフェ建築家"),
-    ("急に漫才コンビを組むなら、ツッコミがうまそうなのは？", "ツッコミの鬼"),
-    ("初めての海外旅行でも、なぜか現地に馴染んでいそうなのは？", "世界の地元民"),
-    ("コントで『実は犯人でした』が一番似合うのは？", "まさかの黒幕"),
-    ("未来から来たと言われても、なぜか信じてしまいそうなのは？", "未来人の説得力"),
-    ("プレゼント交換で、一番インパクトのある品を持ってきそうなのは？", "贈り物の革命児"),
-    ("動物と会話できるようになったら、真っ先に相談されそうなのは？", "動物界の相談役"),
-    ("1日だけ透明人間になったら、意外と何もしなさそうなのは？", "透明な聖人"),
-    ("突然の大雨でも、なぜか傘を持っていそうなのは？", "天気予報いらず"),
-    ("ゲームのチュートリアルだけで、もう満足していそうなのは？", "チュートリアル覇者"),
-    ("街頭インタビューで、いちばん名言を残しそうなのは？", "街角の哲学者"),
-]
+TOPICS = [("この中で一番面白いのは誰？？", "みんなが選んだNo.1")]
 
 
 def error(message: str, status: int = 400):
@@ -91,11 +56,13 @@ def new_room() -> dict:
     room = {
         "code": code, "host_token": host_token, "created": now(), "updated": now(),
         "status": "lobby", "round": 0, "topic_index": None,
-        "used_topics": [], "custom_topics": [], "participants": {}, "candidate_ids": [], "voter_ids": [],
+        "used_topics": [], "participants": {}, "candidate_ids": [], "voter_ids": [],
         "votes": {}, "version": 1,
     }
     ROOMS[code] = room
-    return {"code": code, "hostToken": host_token}
+    _, joined = join_room(room, {"name": "橋野"})
+    room["host_participant_token"] = joined["participantToken"]
+    return {"code": code, "hostToken": host_token, **joined}
 
 
 def touch(room: dict) -> None:
@@ -136,7 +103,7 @@ def join_room(room: dict, body: dict):
 
 
 def choose_topic(room: dict) -> None:
-    topic_count = len(TOPICS) + len(room["custom_topics"])
+    topic_count = len(TOPICS)
     unused = [i for i in range(topic_count) if i not in room["used_topics"]]
     if not unused:
         room["used_topics"] = []
@@ -169,8 +136,9 @@ def rankings(room: dict) -> list:
 
 def get_state(room: dict, token: str) -> dict:
     is_host = token == room["host_token"]
-    person = room["participants"].get(token)
-    topics = TOPICS + room["custom_topics"]
+    participant_token = room["host_participant_token"] if is_host else token
+    person = room["participants"].get(participant_token)
+    topics = TOPICS
     topic = topics[room["topic_index"]] if room["topic_index"] is not None else None
     participants = [{"id": p["id"], "name": p["name"]} for p in room["participants"].values()]
     payload = {
@@ -180,14 +148,16 @@ def get_state(room: dict, token: str) -> dict:
         "participants": participants,
         "candidateIds": room["candidate_ids"],
         "eligible": bool(person and person["id"] in room["voter_ids"]),
-        "myVote": room["votes"].get(token) if person else None,
+        "myVote": room["votes"].get(participant_token) if person else None,
         "votedCount": len(room["votes"]), "voterCount": len(room["voter_ids"]),
         "topic": {"question": topic[0], "award": topic[1]} if topic else None,
     }
-    if is_host:
-        payload["customQuestions"] = [topic[0] for topic in room["custom_topics"]]
     if room["status"] == "revealed":
         payload["results"] = rankings(room)
+        payload["hostWinner"] = any(
+            p["id"] == room["host_participant_token"] and p["rank"] == 1 and p["votes"] > 0
+            for p in payload["results"]
+        )
     return payload
 
 
@@ -211,19 +181,7 @@ def update_room(room: dict, action: str, body: dict):
     if body.get("hostToken") != room["host_token"]:
         return error("幹事の操作権限がありません。", 403)
     if action == "add-topic":
-        question = body.get("question")
-        if not isinstance(question, str):
-            return error("質問を入力してください。")
-        question = re.sub(r"\s+", " ", question).strip()
-        if not 1 <= len(question) <= MAX_QUESTION_LENGTH or any(ord(c) < 32 for c in question):
-            return error(f"質問は1〜{MAX_QUESTION_LENGTH}文字で入力してください。")
-        if len(room["custom_topics"]) >= MAX_CUSTOM_TOPICS:
-            return error(f"追加できる質問は{MAX_CUSTOM_TOPICS}問までです。")
-        if any(question == existing[0] for existing in TOPICS + room["custom_topics"]):
-            return error("この質問はすでに登録されています。")
-        room["custom_topics"].append((question, CUSTOM_AWARD))
-        touch(room)
-        return 200, {"ok": True}
+        return error("今回は固定の1問だけで遊びます。")
     if action == "start":
         if room["status"] != "lobby":
             return error("この操作は現在できません。")
@@ -274,6 +232,10 @@ class Handler(BaseHTTPRequestHandler):
             kind = ".html" if name.endswith(".html") else ".css" if name.endswith(".css") else ".js"
             types = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8"}
             self.send_bytes(200, (BASE / "static" / name).read_bytes(), types[kind], cache=kind != ".html")
+            return
+        if path in ("/hashino.jpg", "/hashino.mp3"):
+            kind = "image/jpeg" if path.endswith(".jpg") else "audio/mpeg"
+            self.send_bytes(200, (BASE / "static" / path[1:]).read_bytes(), kind, cache=True)
             return
         if path == "/health":
             self.send_json(200, {"ok": True})
